@@ -25,3 +25,5 @@ app.include_router(students.router, prefix="/students", tags=["Students"])
 @app.get("/")
 def read_root():
     return {"message": "Backend is running!", "status": "success"}
+
+khsdkjfhkh;
