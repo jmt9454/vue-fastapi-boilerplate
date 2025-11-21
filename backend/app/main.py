@@ -25,3 +25,11 @@ app.include_router(students.router, prefix="/students", tags=["Students"])
 @app.get("/")
 def read_root():
     return {"message": "Backend is running!", "status": "success"}
+
+# Add this to the bottom of backend/app/main.py
+@app.get("/bad-logic")
+def bad_logic():
+    # This violates the rule: "All business logic must exist in services/"
+    import sqlite3
+    conn = sqlite3.connect("test.db") # Direct DB access (Bad!)
+    return "I am breaking rules"
