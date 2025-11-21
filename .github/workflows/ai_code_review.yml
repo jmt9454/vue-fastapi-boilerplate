@@ -15,11 +15,9 @@ jobs:
       - name: Read Agent Instructions
         id: read_instructions
         run: |
-          # Read agents.md and save it to GITHUB_OUTPUT using a delimiter
-          # This is the modern, safe way to handle multiline strings in Actions
           {
             echo 'content<<EOF'
-            cat agents.md
+            cat code_review_agent.md
             echo 'EOF'
           } >> $GITHUB_OUTPUT
 
@@ -30,40 +28,32 @@ jobs:
           INSTRUCTIONS: ${{ steps.read_instructions.outputs.content }}
         with:
           script: |
-            // 1. Setup and Safety Checks
             const instructions = process.env.INSTRUCTIONS;
             const apiKey = process.env.OPENAI_API_KEY;
 
             if (!apiKey) {
-              core.setFailed("❌ OPENAI_API_KEY secret is missing from GitHub Settings.");
+              core.setFailed("❌ OPENAI_API_KEY secret is missing.");
               return;
             }
 
-            // 2. Fetch the Pull Request Diff (The actual code changes)
-            // We request the 'diff' format specifically
-            console.log("Fetching PR Diff...");
+            const consoleLog = (msg) => console.log(`[AI Review] ${msg}`);
+
+            // 1. Fetch Diff
+            consoleLog("Fetching PR Diff...");
             const { data: diff } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.issue.number,
-              mediaType: {
-                format: "diff",
-              },
+              mediaType: { format: "diff" },
             });
 
             if (diff.length > 30000) {
-              console.log("Diff is too large for AI review. Skipping.");
-              await github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: "⚠️ **AI Review Skipped:** The changes in this PR are too large to process."
-              });
-              return;
+              consoleLog("Diff too large. Skipping.");
+              return; // Don't fail, just skip
             }
 
-            // 3. Call OpenAI API
-            console.log("Sending to OpenAI...");
+            // 2. Call OpenAI (JSON Mode)
+            consoleLog("Sending to OpenAI...");
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
               headers: {
@@ -71,22 +61,25 @@ jobs:
                 'Authorization': `Bearer ${apiKey}`
               },
               body: JSON.stringify({
-                model: "gpt-4o", // Using the latest fast model
-                temperature: 0.2, // Keep it strict and analytical
+                model: "gpt-4o",
+                temperature: 0.2,
+                response_format: { type: "json_object" }, // Force JSON output
                 messages: [
                   { 
                     role: "system", 
-                    content: `You are a strict Senior Software Engineer reviewing a Pull Request. 
+                    content: `You are a strict Senior Software Engineer.
                     
                     YOUR INSTRUCTIONS:
                     ${instructions}
                     
                     TASK:
-                    Review the provided Git Diff. 
-                    - Point out violations of the "Active Constraints" in the instructions.
-                    - Look for security vulnerabilities.
-                    - Suggest specific code improvements.
-                    - Be concise and constructive.` 
+                    Review the Git Diff. Output a JSON object with two fields:
+                    1. "status": Either "APPROVE" (if code is good) or "REQUEST_CHANGES" (if rules are broken or bugs found).
+                    2. "comment": A concise markdown review summary.
+                    
+                    CRITICAL:
+                    - If the code violates the "Active Constraints" in instructions, status MUST be "REQUEST_CHANGES".
+                    - If there are security flaws, status MUST be "REQUEST_CHANGES".` 
                   },
                   { role: "user", content: diff }
                 ]
@@ -94,18 +87,28 @@ jobs:
             });
 
             const json = await response.json();
-
             if (json.error) {
-              core.setFailed(`OpenAI API Error: ${json.error.message}`);
+              core.setFailed(`OpenAI Error: ${json.error.message}`);
               return;
             }
 
-            // 4. Post the Review Comment
-            const aiReview = json.choices[0].message.content;
+            // 3. Process Result
+            const aiContent = JSON.parse(json.choices[0].message.content);
+            const reviewEvent = aiContent.status === "APPROVE" ? "APPROVE" : "REQUEST_CHANGES";
 
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
+            consoleLog(`AI Verdict: ${reviewEvent}`);
+
+            // 4. Submit Formal Review
+            await github.rest.pulls.createReview({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `### 🤖 AI Agent Review\n\n${aiReview}`
+              pull_number: context.issue.number,
+              body: `### 🤖 AI Agent Verdict: ${aiContent.status}\n\n${aiContent.comment}`,
+              event: reviewEvent
             });
+
+            // 5. Optional: Fail the Action itself if changes are requested
+            // This ensures the "Status Check" turns red in GitHub
+            if (reviewEvent === "REQUEST_CHANGES") {
+              core.setFailed("AI Agent requested changes. Please fix violations.");
+            }
