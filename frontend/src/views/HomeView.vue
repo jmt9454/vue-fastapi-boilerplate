@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import api from '../services/api'
+import { API } from '@/services' // <--- Updated Import
 
 const status = ref('Waiting for check...')
 const isOnline = ref(false)
@@ -9,10 +9,12 @@ const isLoading = ref(false)
 const checkApi = async () => {
   isLoading.value = true
   try {
-    const response = await api.getHealth()
+    // Accessing the system service via the barrel file
+    const response = await API.system.getHealth()
     status.value = response.data.message
     isOnline.value = true
   } catch (error) {
+    console.error(error)
     status.value = 'Error: Backend is offline!'
     isOnline.value = false
   } finally {
