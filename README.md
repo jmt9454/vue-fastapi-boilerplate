@@ -8,6 +8,8 @@ Before you start, make sure you have these installed:
 
 - [VS Code (Visual Studio Code)](https://code.visualstudio.com/)
 - [Python 3.10+](https://www.python.org/downloads/)
+  - Note: When installing on Windows, check the box "Add Python to PATH".
+  - Verify installation by opening a terminal and running: python --version and pip --version.
 - [Node.js (LTS Version)](https://nodejs.org/)
 - [Git](https://git-scm.com/)
 
@@ -38,7 +40,7 @@ We use a tool called **uv** because it is extremely fast and manages virtual env
 **Windows (PowerShell):**
 
 ```powershell
-powershell -c "irm [https://astral.sh/uv/install.ps1](https://astral.sh/uv/install.ps1) | iex"
+pip install uv
 ```
 
 **Mac / Linux:**
