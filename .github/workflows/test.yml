@@ -1,0 +1,28 @@
+name: Test Backend
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          pip install uv
+          uv pip install -r pyproject.toml
+          uv pip install pytest httpx
+
+      - name: Run Tests
+        run: |
+          # This runs any file starting with test_ inside backend/
+          pytest
