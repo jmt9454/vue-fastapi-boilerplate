@@ -19,36 +19,22 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          # 1. Install uv
           pip install uv
-
-          # 2. Create virtual environment
           uv venv
-
-          # 3. Install dependencies
-          # We explicitly list them here to be safe, in case pyproject.toml is empty
-          # Note: .venv/bin/uv is how we run uv inside the venv context
           uv pip install fastapi uvicorn sqlalchemy alembic pydantic python-dotenv httpx pytest
 
-          # If you have a proper pyproject.toml, you could use:
-          # uv pip install .
-
-      - name: Create Test Configuration
+      - name: Create Dummy Environment
         run: |
-          # We need a .env file for the app to load settings
+          # We create a dummy .env so the app doesn't crash on startup.
+          # We DON'T need a real DB URL here because conftest.py overrides it
+          # with an in-memory database!
           echo "MODE=test" >> .env
           echo "DEBUG=True" >> .env
-          echo "DATABASE_URL=sqlite:///./test.db" >> .env
-          echo "SECRET_KEY=test-secret-key" >> .env
-          echo "ALLOW_ORIGINS=http://localhost:5173" >> .env
-
-      - name: Run Database Migrations
-        run: |
-          # This is CRITICAL. It creates the 'students' table in test.db
-          # We use the executable inside .venv/bin/ directly
-          .venv/bin/alembic upgrade head
+          echo "DATABASE_URL=sqlite:///:memory:" >> .env
+          echo "ALLOW_ORIGINS=http://localhost:3000" >> .env
 
       - name: Run Tests
         run: |
-          # Run pytest using the virtual environment
+          # This command finds conftest.py (which sets up the memory DB)
+          # and then runs all your tests.
           .venv/bin/pytest
