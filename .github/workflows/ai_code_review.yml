@@ -17,7 +17,7 @@ jobs:
         run: |
           {
             echo 'content<<EOF'
-            cat code_review_agent.md
+            cat .github/agents/code_review_agent.md
             echo 'EOF'
           } >> $GITHUB_OUTPUT
 
