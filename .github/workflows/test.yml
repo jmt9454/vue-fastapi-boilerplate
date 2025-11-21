@@ -26,8 +26,6 @@ jobs:
       - name: Create Dummy Environment
         run: |
           # We create a dummy .env so the app doesn't crash on startup.
-          # We DON'T need a real DB URL here because conftest.py overrides it
-          # with an in-memory database!
           echo "MODE=test" >> .env
           echo "DEBUG=True" >> .env
           echo "DATABASE_URL=sqlite:///:memory:" >> .env
@@ -35,6 +33,6 @@ jobs:
 
       - name: Run Tests
         run: |
-          # This command finds conftest.py (which sets up the memory DB)
-          # and then runs all your tests.
+          # FIX: Add current directory (.) to PYTHONPATH so Python finds 'app'
+          export PYTHONPATH=$PYTHONPATH:.
           .venv/bin/pytest
