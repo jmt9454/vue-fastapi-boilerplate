@@ -1,0 +1,439 @@
+**Project Overview**
+- **Name**: `vue-fastapi-boilerplate` : A minimal full-stack boilerplate with a Vue 3 + Vite frontend and a FastAPI backend.
+- **Purpose**: Student records CRUD demo (API, DB models, migrations, simple UI).
+- **Root**: repository root contains `backend/` and `frontend/` directories.
+
+**Top-Level Layout**
+- **`backend/`**: FastAPI application, SQLAlchemy models, Alembic migrations, tests. Key files:
+  - `app/main.py` : FastAPI app entrypoint, CORS middleware, routers registered (`/students`).
+  - `app/routers/students.py` : Student CRUD endpoints mounted at prefix `/students`.
+  - `app/services/student_service.py` : Database operations (get/create/update/delete) for `Student`.
+  - `app/models/student.py` : SQLAlchemy `Student` model, table `students` with fields `id,name,major,gpa`.
+  - `app/schemas/student.py` : Pydantic models: `StudentBase`, `StudentCreate`, `StudentUpdate`, `StudentResponse`.
+  - `app/core/config.py` : present but currently empty (placeholder for config/env handling).
+  - `app/core/database.py` : database setup (SQLAlchemy `Base`, engine, `SessionLocal`) — used by routers and models.
+  - `alembic/` and `alembic.ini` : migration configuration and versioned migrations (one migration present creating `students` table).
+  - `requirements.txt` : pinned Python dependencies (FastAPI, SQLAlchemy, Alembic, uvicorn, python-dotenv, psycopg2-binary, etc.).
+  - `tests/` : pytest-based unit/integration tests using an in-memory SQLite DB via fixtures (`conftest.py`, `test_student.py`).
+
+- **`frontend/`**: Vue 3 + Vite app with Vuetify. Key files:
+  - `package.json` : dev/prod scripts (`dev`, `build`, `preview`, `test:unit`). Dependencies include `vue`, `vue-router`, `axios`, `vuetify`.
+  - `src/services/` : client-side API layer. Files include `apiClient.js`, `api.js`, `StudentService.js`, `SystemService.js`, and `index.js` (service aggregator). See "Frontend Services" section below.
+  - `src/views/StudentsView.vue` : UI for listing, creating, updating, deleting students. Uses the API service.
+  - `src/main.js`, `App.vue`, `router/index.js` : standard Vue app bootstrap and routing.
+
+**API Surface (explicit)**
+- **Health**: `GET /` : returns JSON {message, status} from `app/main.py`.
+- **Students** (mounted at `/students` via `app.include_router`):
+  - `GET /students/` : list students, query params `skip`, `limit` — returns `List[StudentResponse]`.
+  - `GET /students/{student_id}` : retrieve one student — returns `StudentResponse` or 404.
+  - `POST /students/` : create student; request body `StudentCreate` (`name`, `major`, optional `gpa`) — returns created `StudentResponse`.
+  - `PUT /students/{student_id}` : update student; body `StudentUpdate` (all fields optional) — returns updated `StudentResponse` or 404.
+  - `DELETE /students/{student_id}` : deletes and returns deleted `StudentResponse` or 404.
+
+**Data Models and Schemas**
+- **SQLAlchemy model**: `Student(id:int, name:str, major:str, gpa:Optional[str])` mapped to `students` table.
+- **Pydantic Schemas**:
+  - `StudentBase(name, major, gpa)`
+  - `StudentCreate` inherits `StudentBase` (create request).
+  - `StudentUpdate` fields all optional (partial updates accepted).
+  - `StudentResponse` extends `StudentBase` with `id` and uses `Config.from_attributes = True` to accept ORM objects.
+
+**Backend Implementation Notes**
+- The router gets a DB session via `get_db()` (creates `SessionLocal()` and yields it; closes after use).
+- Service functions in `student_service.py` perform typical SQLAlchemy patterns: query, add, commit, refresh.
+- `update_student` uses `student_data.model_dump(exclude_unset=True)` to only apply provided fields (Pydantic v2 usage).
+- Tests use an in-memory SQLite engine (`sqlite:///:memory:`) with `StaticPool` to emulate DB across tests; `conftest.py` overrides the `get_db` dependency for `TestClient`.
+
+**How to Run (developer)**
+- Backend (Python 3.11+ recommended according to package pins):
+  - Create virtualenv and install: `python -m venv .venv; .\\.venv\\Scripts\\Activate.ps1; pip install -r backend/requirements.txt`
+  - Run dev server: `uvicorn app.main:app --reload --app-dir backend/app` (or change working directory to `backend` then `uvicorn app.main:app --reload`).
+  - Migrations: `alembic -c alembic.ini upgrade head` from `backend/` (requires `DATABASE_URL` configured in `app/core/database.py` or env). The repo includes a migration creating the `students` table.
+- Frontend:
+  - Install & run: from `frontend/`: `npm install` then `npm run dev` (Vite dev server). Ensure `VITE_API_URL` points to backend (e.g. `http://localhost:8000`).
+
+**Tests**
+- Backend tests: run from `backend/` root: `pytest -q` (tests use the TestClient and in-memory SQLite DB). Ensure dev deps for testing available (pytest, httpx may be transitive via FastAPI dependencies).
+- Frontend unit tests: `npm run test:unit` in `frontend/` (Vitest + Vue Test Utils).
+
+**Notable Files / Code Pointers**
+- `backend/app/main.py` : app & CORS setup; registers `students` router.
+- `backend/app/routers/students.py` : routes + dependency `get_db()`.
+- `backend/app/services/student_service.py` : single place for DB logic—useful when building business logic or instrumentation.
+- `backend/app/schemas/student.py` : Pydantic models used for validation and response models.
+- `frontend/src/services/api.js` : canonical client methods to call backend endpoints.
+- `frontend/src/views/StudentsView.vue` : example usage of client and UI flows (create/update/delete UI patterns).
+
+**Frontend Services (`src/services`)**
+
+- Purpose: centralize HTTP client configuration, auth interception, and per-resource service wrappers so UI components import a small, stable surface instead of raw axios calls.
+
+- Files and responsibilities:
+  - `apiClient.js`: A single `axios` instance configured with `baseURL: import.meta.env.VITE_API_URL` and JSON headers. It also installs a request interceptor that injects `Authorization: Bearer <token>` from `localStorage` when present. Ingest this file early — it contains auth behavior that affects all requests.
+  - `api.js`: A lightweight, direct wrapper around an axios instance (keeps older `api` shape). Provides methods: `getHealth()`, `getStudents()`, `createStudent()`, `updateStudent()`, `deleteStudent()`.
+  - `StudentService.js`: Uses `apiClient` and exposes `getStudents()`, `createStudent(data)`, `updateStudent(id,data)`, `deleteStudent(id)` — the canonical resource client for students used by views.
+  - `SystemService.js`: Uses `apiClient` and exposes `getHealth()` for health checks.
+  - `index.js`: Aggregates services into an `API` object: `API.students` and `API.system` for convenient imports.
+
+- Ingestion guidance for these files:
+  - Ingest `apiClient.js` first (auth interceptors, global headers). Tag metadata: `type: client`, `language: javascript`, `summary: axios client + auth interceptor`.
+  - Ingest per-resource service wrappers (`StudentService.js`, `SystemService.js`) next; they are the canonical shapes of API calls UI components will use.
+  - Ingest `index.js` last — it documents how services are bundled for import (`API.students`, `API.system`).
+  - For each file, attach metadata: `repo_path`, `language`, `type` (`client` / `service` / `aggregator`), `exports` (list of exported functions/objects), and `summary`.
+
+- LLM QA tips specific to frontend services:
+  - Prefer the `StudentService` functions when synthesizing example client code — they reflect actual headers and interceptors from `apiClient`.
+  - If an answer involves authentication or tokens, consult `apiClient.js` interceptors to see how tokens are stored and attached.
+  - When reproducing requests, use the `baseURL` from `import.meta.env.VITE_API_URL` and the exact paths from `StudentService` or `api.js`.
+
+
+**Dependencies (high level)**
+- Backend (`backend/requirements.txt` highlights): `fastapi`, `uvicorn`, `sqlalchemy`, `pydantic`, `alembic`, `python-dotenv`, `psycopg2-binary`.
+- Frontend (`frontend/package.json` highlights): `vue`, `vue-router`, `axios`, `vuetify`, `vite`, `vitest`.
+
+**Environment / Config**
+- Frontend expects `VITE_API_URL` (used by `src/services/api.js`).
+- Backend currently relies on `app/core/database.py` for the DB URL — check that file to determine whether env var `DATABASE_URL` or similar is read. `app/core/config.py` exists as an empty placeholder.
+
+**Ingestion Guidance for LLMs**
+- Prioritize these files as sources of truth (in order):
+  1. `backend/app/routers/students.py` (API surface)
+  2. `backend/app/schemas/student.py` (request/response shapes)
+  3. `backend/app/models/student.py` (DB model)
+  4. `backend/app/services/student_service.py` (business/DB logic)
+  5. `backend/app/main.py` (app wiring)
+  6. `frontend/src/services/api.js` (client methods)
+  7. `frontend/src/views/StudentsView.vue` (UI flows)
+  8. `backend/tests/` (integration examples showing lifecycle and expected behavior)
+
+- Chunking strategy: prefer file-level chunks; further split large files (over 2–3 KB) by logical regions (imports, definitions, routes, helpers). Include nearby test(s) when ingesting endpoint behavior.
+- Metadata to attach per chunk: `path`, `file_type` (router/schema/model/test/view), `language` (python/js/vue), `lines` (start/end), and `summary` extracted from the file header or first function/class docstring (if present).
+- Prioritize canonical sources for ground-truth answers: API routers & schemas > service logic > models > tests > frontend usage.
+
+**Search / QA Hints for LLM**
+- When answering API questions, validate against `backend/app/routers/students.py` and `backend/app/schemas/student.py`.
+- For database structure, consult `backend/app/models/student.py` and `alembic/versions/*` migration files.
+- For example requests/responses, prefer `backend/tests/test_student.py` (it demonstrates a full lifecycle: create, read, update, delete, and error conditions).
+
+**Maintenance Notes / TODOs (developer-facing)**
+- `app/core/config.py` is empty — centralize environment config there (e.g., `DATABASE_URL`, `ALLOW_ORIGINS`, other runtime flags).
+- Consider storing DB URL and other secrets in `.env` and loading via `python-dotenv` (already used in `app/main.py` via `load_dotenv()`).
+- Add OpenAPI doc notes or examples using FastAPI's `responses` or tags to improve auto-generated docs.
+
+**Quick Examples**
+- Create student (HTTP):
+  - Request: `POST /students/` with JSON `{"name":"Alice","major":"CS","gpa":"3.8"}`
+  - Response: `200` JSON `{"id":1,"name":"Alice","major":"CS","gpa":"3.8"}`
+- Update student (partial):
+  - Request: `PUT /students/1` with JSON `{"major":"Math"}`
+  - Response: updated student JSON; non-sent fields remain unchanged.
+
+**Intended LLM Ingestion Order & Metadata**
+- Ingest order: routers -> schemas -> services -> models -> tests -> frontend client & views -> migration files -> requirements/package.json -> README files.
+- For each ingested file chunk, include these metadata fields:
+  - `repo_path` : e.g. `backend/app/routers/students.py`
+  - `language` : `python` / `javascript` / `vue` / `ini` / `json`
+  - `type` : `router` / `schema` / `model` / `service` / `test` / `view` / `config` / `migration`
+  - `summary` : one-line summary (extractable)
+
+**Extending / Removing Features (Alembic, FastAPI, Vue)**
+
+- High-level flow when adding or removing a persistent feature (DB-backed):
+  1. Update the SQLAlchemy model(s) in `backend/app/models/` (add/remove fields or tables).
+  2. Update Pydantic schema(s) in `backend/app/schemas/` to reflect new request/response shapes.
+  3. Update service functions in `backend/app/services/` to implement the new behavior (create/update/read/delete logic).
+  4. Update router(s) in `backend/app/routers/` to expose new endpoints or change existing ones.
+  5. Create an Alembic migration to update the database schema.
+  6. Update frontend client (`frontend/src/services/api.js`) and UI (`frontend/src/views/*.vue` or new components) to consume the changed API.
+  7. Update or add tests (backend `backend/tests/` and frontend unit tests) and run the test suite.
+
+- Alembic: add/remove DB schema
+  - Common commands (run from `backend/`):
+    - Create an autogenerate migration:
+      ```powershell
+      alembic -c alembic.ini revision --autogenerate -m "add field X to students"
+      ```
+    - Apply migrations to the DB:
+      ```powershell
+      alembic -c alembic.ini upgrade head
+      ```
+    - Downgrade (rollback one revision):
+      ```powershell
+      alembic -c alembic.ini downgrade -1
+      ```
+  - Tips:
+    - Ensure `app/core/database.py` or your env provides the correct `DATABASE_URL` when autogenerating; Alembic needs to import your models or have proper `target_metadata` set in `alembic/env.py`.
+    - Review generated migration files in `alembic/versions/` and edit carefully—autogenerate often needs human review for complex changes (renames vs drops).
+    - For destructive changes (dropping columns/tables), consider writing a careful downgrade that preserves data or add a migration that marks the field deprecated first.
+
+- FastAPI: add/remove endpoints, models, and logic
+  - Add a new resource or endpoint:
+    1. Add or update SQLAlchemy model in `app/models/`.
+    2. Add new `Pydantic` schema(s) in `app/schemas/` describing input/output shapes.
+    3. Add service functions in `app/services/` containing DB logic.
+    4. Add router functions in `app/routers/` and register the router in `app/main.py` (or existing router file).
+  - Example: adding `email` to Student
+    - Update model: add `email = Column(String, nullable=True)`.
+    - Update schema: add `email: Optional[str] = None` to `StudentBase` or `StudentCreate`.
+    - Update service create/update to set `email` when present.
+    - Generate and apply Alembic migration (see above).
+  - Removing an endpoint or field:
+    - Deprecate in code first (keep endpoint but mark deprecated in docstring/OpenAPI).
+    - Update clients to stop using it, run migration to remove DB columns, then remove server code in a follow-up release.
+  - Testing:
+    - Add unit/integration tests under `backend/tests/` and run `pytest`.
+    - Use `conftest.py` patterns if DB fixtures are needed (in-memory SQLite is convenient for tests).
+
+- Vue (frontend): add/remove UI features
+  - Adding a view or component:
+    1. Add component under `frontend/src/components/` or view under `frontend/src/views/`.
+    2. Add route in `frontend/src/router/index.js` if the view should be routable.
+    3. Add or update calls in `frontend/src/services/api.js` to match backend endpoints.
+    4. Use Vite dev server (`npm run dev`) to hot-reload and test UI changes.
+  - Example: display `email` in `StudentsView.vue` table
+    - Update `StudentsView.vue` template to include an `Email` column and data bindings for `item.email`.
+    - Ensure `api.getStudents()` returns `email` (backend schema updated).
+  - Removing a feature:
+    - Remove the UI bits first, keep API compatible if other clients still depend on it.
+    - Alternatively, hide behind feature flags or conditional rendering while backend is removed in a coordinated deploy.
+  - Testing:
+    - Add unit tests with Vitest in `frontend/__tests__/` and run `npm run test:unit`.
+
+- Example end-to-end change (add `graduation_year` to Student):
+  1. Update `backend/app/models/student.py`:
+     - Add `graduation_year = Column(Integer, nullable=True)`.
+  2. Update `backend/app/schemas/student.py`:
+     - Add `graduation_year: Optional[int] = None` to `StudentBase` and `StudentUpdate`.
+  3. Update `backend/app/services/student_service.py` to read/write `graduation_year` on create/update.
+  4. Generate alembic migration and apply:
+     ```powershell
+     alembic -c alembic.ini revision --autogenerate -m "add graduation_year to students"
+     alembic -c alembic.ini upgrade head
+     ```
+  5. Update `frontend/src/services/api.js` if endpoint signatures changed (usually not needed for a new optional field).
+  6. Update `frontend/src/views/StudentsView.vue` to show/edit `graduation_year` in forms and table.
+  7. Update tests: backend `test_student.py` (create with new field), frontend unit tests.
+
+- Best practices and cautions
+  - Always run tests after schema or API changes.
+  - Run migrations in a safe environment and back up production DB before destructive changes.
+  - When adding required fields, prefer a two-step migration: add nullable column, backfill data, then make it non-nullable in a later migration.
+  - Keep Pydantic schemas and SQLAlchemy models consistent; mismatches will produce runtime validation errors or missing fields in responses.
+  - Use feature flags or phased rollouts if multiple clients depend on the API.
+
+
+**Contact / Next Steps**
+- If you want, I can also produce a JSON manifest listing each file, size, recommended chunk boundaries, and short summaries so an LLM ingestion pipeline can iterate automatically. Reply "generate manifest" to proceed.
+
+**.github Workflows & Agents**
+
+- Location and purpose:
+  - The repository may include a `.github/` directory which commonly contains two subfolders of interest:
+    - `.github/workflows/` : GitHub Actions workflow definitions (`*.yml`) that run CI/CD tasks (tests, linting, builds, deployments).
+    - `.github/agents/` : used in some projects to store supporting agent scripts, reusable action metadata, or automated "agents" used by workflows or developer tooling.
+
+- What to prioritize for ingestion:
+  1. Ingest all YAML files under `.github/workflows/` early — they define CI triggers, job steps, required secrets, and environment setup; these often reveal how tests and builds are executed and what commands to reproduce locally.
+ 2. Ingest any reusable workflow files (often in `.github/workflows/` or `.github/actions/`) and any `agents/` files since they can contain custom scripts or configuration used by CI.
+ 3. Capture required repository secrets referenced in workflows (names only, not values) so an LLM can flag missing local equivalents for reproducing CI commands.
+
+- Typical workflow content to extract (per job):
+  - `name`, `on` triggers (push, pull_request, workflow_dispatch), `jobs` and each job's `runs-on` runner (ubuntu-latest, windows-latest), `steps` (setup, install, test, build, publish), `uses` (actions used), and `env`/`secrets` references.
+  - Commands executed in `run:` steps (e.g., `pip install -r backend/requirements.txt`, `uvicorn ...`, `npm ci && npm run build`, `pytest -q`). These are high-value for reproducing CI locally.
+
+- Agents directory specifics:
+  - If `.github/agents/` exists, ingest each file and treat them as `script` or `agent` type. They often include helper scripts, Dockerfiles, or config defining long-running agents or chatops bots. Extract:
+    - Purpose and invocation method (how workflows call the agent script).
+    - Required runtime (python/node), dependencies, and environment variables.
+
+- Security and secrets note:
+  - Workflows often reference secrets (e.g., `secrets.DOCKERHUB_TOKEN`, `secrets.PYPI_API_TOKEN`). For ingestion, record the secret keys (names) but never attempt to fetch or store secret values.
+
+- Ingestion metadata for `.github` files:
+  - `repo_path`: e.g., `.github/workflows/ci.yml`
+  - `language`: `yaml` / `bash` / `python` / `dockerfile`
+  - `type`: `workflow` / `agent_script` / `reusable_workflow`
+  - `summary`: one-line description of trigger and primary jobs (tests/build/deploy)
+
+- How LLMs can use workflows/agents during QA and reproduction:
+  - Use workflow `run:` steps as canonical reproduction commands for CI tasks (run them locally in the same order and environment where possible).
+  - Use `uses:` action references to learn about setup steps (e.g., `actions/setup-python@v4` implies Python setup commands and versions).
+  - Flag any OS-specific steps (Windows vs Linux) and map the correct local commands for the developer's platform.
+
+- Example: what to extract from a typical `ci.yml` job step:
+  - Setup Python: `- uses: actions/setup-python@v4` with `python-version: '3.11'`
+  - Install backend deps: `pip install -r backend/requirements.txt`
+  - Run backend tests: `pytest -q backend/tests`
+  - Install frontend deps: `cd frontend && npm ci`
+  - Run frontend unit tests/build: `npm run test:unit` or `npm run build`
+
+Include the `.github` files and their extracted metadata early in ingestion so ingestion-aware LLMs can reproduce CI locally and understand the repository's automation surface.
+
+**Developer Setup (expanded & Windows-friendly)**
+
+- Python environment (recommended):
+  - Prefer Python 3.11 (pinned in CI examples). Two approaches to create an environment:
+    - Using `uv` (project README uses `uv`):
+      ```powershell
+      # From repository root
+      cd backend
+      pip install uv        # one-time
+      uv venv               # creates .venv inside backend
+      .\\.venv\\Scripts\\Activate.ps1
+      uv pip install -r pyproject.toml
+      ```
+    - Using builtin venv (alternate):
+      ```powershell
+      cd backend
+      python -m venv .venv
+      .\\.venv\\Scripts\\Activate.ps1
+      pip install -r requirements.txt
+      ```
+  - Notes:
+    - If `uv` is not available, `python -m venv` + `pip` is fully sufficient.
+    - On PowerShell, use `\\.venv\\Scripts\\Activate.ps1` to activate; on legacy cmd use `.venv\\Scripts\\activate`.
+
+- Environment file & DATABASE_URL:
+  - Copy `.env.example` to `.env` and edit values. On PowerShell:
+    ```powershell
+    Copy-Item .env.example .env
+    notepad .env
+    ```
+  - Ensure `DATABASE_URL` in `.env` points to the desired DB (e.g. `sqlite:///./local.db` for local dev or a PostgreSQL URL for cloud).
+
+**Database & Alembic (expanded)**
+
+- Create and run migrations (local dev):
+  - After models change, autogenerate a migration (from `backend/`):
+    ```powershell
+    alembic -c alembic.ini revision --autogenerate -m "describe change"
+    alembic -c alembic.ini upgrade head
+    ```
+  - If you don't have a production `DATABASE_URL` set during autogenerate, point Alembic at a local DB or ensure `alembic/env.py`'s `target_metadata` imports your models.
+  - To create the local DB for the first time (if using SQLite), ensure `.env` contains a SQLite URL and run `alembic upgrade head`.
+
+ - Best practices reiterated:
+  - When adding non-nullable columns in production: (1) add column nullable, (2) backfill data, (3) make column non-nullable in later migration.
+  - Always inspect autogenerated migration files before applying.
+
+**Running Locally (two-terminal workflow — exact commands)**
+
+- Backend terminal (PowerShell):
+  ```powershell
+  cd backend
+  .\\.venv\\Scripts\\Activate.ps1   # activate venv
+  uvicorn app.main:app --reload     # runs FastAPI on :8000
+  ```
+
+- Frontend terminal (PowerShell):
+  ```powershell
+  cd frontend
+  npm install
+  npm run dev                        # Vite on :5173
+  ```
+
+**Testing (expanded)**
+
+- Backend tests (pytest):
+  - From `backend/` (with venv active):
+    ```powershell
+    pytest -q
+    ```
+  - Tests use an in-memory SQLite DB (see `backend/tests/conftest.py`) and will not touch `local.db`.
+
+- Frontend tests (Vitest):
+  - From `frontend/`:
+    ```powershell
+    npm run test:unit
+    ```
+
+**Build & Deploy (concise reference)**
+
+- Prepare `requirements.txt` for Render (if using `uv` + `pyproject.toml`):
+  ```powershell
+  cd backend
+  uv pip compile pyproject.toml -o requirements.txt
+  git add requirements.txt && git commit -m "Add compiled requirements"
+  ```
+
+- Render backend start command suggestion (Render UI `Start Command`):
+  ```text
+  alembic -c alembic.ini upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+  ```
+
+- Vercel frontend settings reminder:
+  - Set `Root Directory` to `frontend` and add `VITE_API_URL` env var pointing to backend URL.
+
+**CI / GitHub Actions (practical notes)**
+
+- When ingesting `.github/workflows/*`:
+  - Extract exact `run:` commands (install, test, build) to reproduce CI locally.
+  - Note referenced secrets and runners (e.g., `windows-latest` vs `ubuntu-latest`).
+
+**Production readiness checklist (short)**
+
+- Before a production deploy:
+  - Ensure `DATABASE_URL` and other secrets are set in the hosting environment.
+  - Compile a `requirements.txt` if using a build tool that needs it.
+  - Back up the DB before applying destructive migrations.
+  - Run the full test suite locally or in CI.
+
+  **Final Checklist & Manifest Schema (for automated ingestion)**
+
+  - Quick sanity checklist before ingestion into an LLM index:
+    - Ensure README, `llms.txt`, and `pyproject.toml`/`package.json` are present and up-to-date.
+    - Ensure `alembic/versions/*` and `app/models/` are ingested together so migrations and models can be cross-referenced.
+    - Ingest `.github/workflows/*` early so CI reproduction commands are available.
+    - Ingest `frontend/src/services/apiClient.js` before views so auth and headers are captured.
+
+  - Manifest JSON schema (recommended fields per file chunk):
+    - `repo_path` (string): relative path in repo
+    - `language` (string): `python` | `javascript` | `vue` | `yaml` | `ini` | `json` | `dockerfile`
+    - `type` (string): `router` | `schema` | `model` | `service` | `test` | `view` | `workflow` | `agent_script` | `config` | `migration` | `client` | `aggregator`
+    - `size_bytes` (int): file size
+    - `chunk_ranges` (array of {start_line,int,end_line,int}): recommended chunk boundaries
+    - `exports` (array<string>): exported symbols (functions/classes/objects) when applicable
+    - `summary` (string): one-line summary
+    - `priority` (int): ingestion priority (1 highest)
+
+  - Example manifest entry:
+    ```json
+    {
+      "repo_path": "frontend/src/services/apiClient.js",
+      "language": "javascript",
+      "type": "client",
+      "size_bytes": 768,
+      "chunk_ranges": [{"start_line": 1, "end_line": 120}],
+      "exports": ["default"],
+      "summary": "Axios client with auth interceptor that injects Bearer token from localStorage.",
+      "priority": 1
+    }
+    ```
+
+  **How to add a new GitHub Actions workflow (practical steps)**
+
+  - Create a YAML file under `.github/workflows/`, e.g. `.github/workflows/ci.yml`.
+  - Include `on:` triggers (`push`, `pull_request`, `workflow_dispatch`) and `jobs` definitions.
+  - Use `actions/setup-python@v4` and `actions/setup-node@v4` as needed to match local dev versions.
+  - Reference repository secrets as `secrets.NAME` (DO NOT commit secret values to the repo).
+  - Test a workflow manually using `workflow_dispatch` in the YAML, then use the Actions UI to run it.
+
+  **How to add a new automated agent script in `.github/agents/`**
+
+  - Add the script or Dockerfile to `.github/agents/` and document its invocation and runtime in the script header or a README in the folder.
+  - Reference it from workflows using `run: ./.github/agents/my-agent.sh` or build/publish a Docker image and reference it.
+
+  **Short extension checklist for contributors (end-to-end)**
+
+  1. Update SQLAlchemy model(s) and Pydantic schema(s).
+  2. Update service layer and tests to cover new behavior.
+  3. Autogenerate and review Alembic migration; apply to staging/dev DB.
+  4. Update frontend client and views; add Vitest unit tests.
+  5. Update or create CI workflow to run tests and migrations in CI environment.
+  6. Deploy to a dev environment, run integration smoke tests, then promote to production.
+
+  ----
+
+  If you'd like, I'll generate the JSON manifest for this repo now (file list, sizes, recommended chunk boundaries and summaries) so you can feed it to your ingestion pipeline. Reply "generate manifest" and I'll produce it as `llms-manifest.json` in the repo root.
+
