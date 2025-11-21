@@ -1,0 +1,363 @@
+🏁 Getting Started with the Boilerplate
+
+Welcome! This guide will help you fork this repository, set up your environment, and get the application running on your machine using VS Code.
+
+📦 Prerequisites
+
+Before you start, make sure you have these installed:
+
+VS Code (Visual Studio Code)
+
+Python 3.10+
+
+Node.js (LTS Version)
+
+Git
+
+1️⃣ Fork & Clone
+
+Fork: Click the "Fork" button in the top-right corner of this GitHub page. This creates your own copy of the code.
+
+Clone: Open your terminal/command prompt and run:
+
+# Replace YOUR-USERNAME with your actual GitHub username
+
+git clone https://github.com/YOUR-USERNAME/vue-fastapi-boilerplate.git
+cd vue-fastapi-boilerplate
+
+Open in VS Code:
+
+code .
+
+2️⃣ Setup the Backend (Python)
+
+We use a tool called uv because it is extremely fast and manages virtual environments automatically.
+
+Install uv (if you don't have it):
+
+# Windows (PowerShell)
+
+powershell -c "irm [https://astral.sh/uv/install.ps1](https://astral.sh/uv/install.ps1) | iex"
+
+# Mac / Linux
+
+curl -LsSf [https://astral.sh/uv/install.sh](https://astral.sh/uv/install.sh) | sh
+
+Setup the Environment:
+Open a terminal in VS Code (Ctrl+`) and run:
+
+cd backend
+
+# Create the virtual environment
+
+uv venv
+
+# Activate it
+
+# Windows:
+
+.venv\Scripts\activate
+
+# Mac/Linux:
+
+source .venv/bin/activate
+
+# Install libraries from pyproject.toml
+
+uv pip install -r pyproject.toml
+
+Create the Database:
+The app needs a database to start. We use Alembic to create it.
+
+# Create your .env file
+
+cp .env.example .env
+
+# (On Windows, just manually copy and rename .env.example to .env)
+
+# Create the tables in local.db
+
+alembic upgrade head
+
+3️⃣ Setup the Frontend (Vue.js)
+
+Open a NEW terminal (Click the + icon in the VS Code terminal panel).
+
+Navigate to the frontend:
+
+cd frontend
+
+Install dependencies:
+
+npm install
+
+🚀 Run the App (The "Two Terminal" Method)
+
+To work on this project, you need two servers running at the same time.
+
+FastAPI (Backend) running on port 8000.
+
+Vue (Frontend) running on port 5173.
+
+How to do this in VS Code:
+
+Terminal 1 (Backend):
+Make sure you are in the backend folder and your venv is active ((backend) should appear in the prompt).
+
+uvicorn app.main:app --reload
+
+You should see: Application startup complete.
+
+Terminal 2 (Frontend):
+Click the Split Terminal icon (or press Ctrl + \) to open a side-by-side terminal.
+Make sure you are in the frontend folder.
+
+npm run dev
+
+You should see: Local: http://localhost:5173/
+
+🌐 Verify It Works
+
+Open your browser to http://localhost:5173.
+
+You should see the "System Status" page.
+
+Click "Check Connection".
+
+If it says "Backend is running!", you are ready to code!
+
+🆘 Common Issues
+
+"uv is not recognized": Restart VS Code after installing uv.
+
+"ModuleNotFoundError: No module named 'app'": You are running uvicorn from the wrong folder. Make sure you cd backend before running uvicorn.
+
+"Internal Server Error" when saving data: You forgot to run alembic upgrade head to create your database tables.
+
+"CORS Error": Check your backend/.env file. Ensure ALLOW_ORIGINS includes http://localhost:5173.
+
+🛡️ Key Concept: Environment Safety
+
+It is important to understand where your data lives so you don't accidentally delete real user data.
+
+💻 Local Environment (Safe Zone)
+
+Frontend: localhost:5173 (Your Vue app)
+
+Backend: localhost:8000 (Your FastAPI server)
+
+Database: SQLite (local.db)
+
+What this means: When you run the app on your laptop, it uses a local file for the database. You can delete, drop, or break this database as much as you want. It cannot touch the production data.
+
+☁️ Cloud Environment (Danger Zone)
+
+Frontend: your-app.vercel.app
+
+Backend: your-app.onrender.com
+
+Database: PostgreSQL (Neon/Railway)
+
+What this means: When you push code to GitHub and it deploys to dev or main, the boilerplate automatically detects it is running in the cloud. It switches from SQLite to PostgreSQL.
+
+Safety Mechanism: The app uses the DATABASE_URL environment variable to decide. Locally, it points to a file. In the cloud, it points to a server. This prevents local tests from "nuking" production.
+
+☁️ Setting up Cloud Databases (Neon)
+
+When you are ready to deploy to the cloud (Render/Railway/Vercel), you need a real PostgreSQL database. We recommend Neon.tech because it has a generous free tier and supports "Branches" (like Git) for your data.
+
+1. Sign Up
+
+Go to Neon.tech and sign up (GitHub login is easiest).
+
+2. Create Your Project
+
+Click "New Project".
+
+Name it university-app (or whatever you like).
+
+Region: Choose one close to you (e.g., US East).
+
+Click Create Project.
+
+3. Get Your PROD Connection String
+
+Once created, you will land on the Dashboard.
+
+Look for the "Connection Details" box.
+
+Ensure the branch is selected as main (This is your Production DB).
+
+Click Copy on the Connection String (it starts with postgres://...).
+
+Note: If it starts with postgres://, change it to postgresql:// (add the 'ql') when adding to Render.
+
+Save this! You will paste this into Render's Environment Variables as DATABASE_URL.
+
+4. Create Your DEV Database (Branching)
+
+Neon allows you to create a "copy" of your database for testing, called a Branch.
+
+Click "Branches" on the left sidebar.
+
+Click "New Branch".
+
+Name it dev.
+
+Click Create Branch.
+
+You will see a new Connection String specific to this branch.
+
+Save this! Use this URL if you set up a separate "Dev" deployment on Render.
+
+🚀 Deploying the Backend (Render)
+
+We use Render.com because it has a great free tier for Python applications.
+
+0. Pre-Flight Check (Crucial!)
+
+Render does not know about uv or pyproject.toml by default. You must generate a standard requirements.txt file before deploying.
+Run this in your backend/ folder:
+
+uv pip compile pyproject.toml -o requirements.txt
+
+Commit and Push this new file to GitHub.
+
+1. Create Web Service
+
+Go to Render Dashboard.
+
+Click New + -> Web Service.
+
+Connect your GitHub repository.
+
+2. Configuration Settings
+
+Use these exact settings to make it work:
+
+Name: my-app-backend
+
+Root Directory: backend (⚠️ IMPORTANT: If you miss this, it will crash)
+
+Runtime: Python 3
+
+Build Command: pip install -r requirements.txt
+
+Start Command: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+Note: The alembic upgrade head part ensures your database tables are created automatically on every deploy.
+
+3. Environment Variables
+
+Scroll down to the Environment Variables section and add these:
+
+PYTHON_VERSION: 3.11.0
+
+DATABASE_URL: (Paste your Neon connection string here. Remember to change postgres:// to postgresql://)
+
+SECRET_KEY: (Any random string)
+
+ALLOW_ORIGINS: \* (You will update this later with your frontend URL)
+
+4. Deploy
+
+Click Create Web Service. It will take a few minutes. When it says "Live", copy the URL (e.g., https://my-app.onrender.com).
+
+🌐 Deploying the Frontend (Vercel)
+
+We use Vercel to host the Frontend. It is designed for static frameworks like Vue.js and is incredibly fast (and free).
+
+1. Create Project
+
+Go to Vercel.com and sign up (Login with GitHub).
+
+Click "Add New..." -> Project.
+
+Import your repository.
+
+2. Configuration
+
+Framework Preset: It should auto-detect Vue.js.
+
+Root Directory: Click "Edit" and select frontend.
+
+3. Environment Variables
+
+Click the "Environment Variables" dropdown and add:
+
+Name: VITE_API_URL
+
+Value: (Paste your Render Backend URL here, e.g., https://my-app.onrender.com).
+
+⚠️ Note: Do NOT add a trailing slash / at the end.
+
+4. Deploy
+
+Click Deploy. Wait for the confetti! 🎉
+
+5. 🚨 CRITICAL: Fix CORS on Render
+
+Right now, your frontend is live, but it cannot talk to your backend because of security settings.
+
+Copy your new Vercel URL (e.g., https://university-app.vercel.app).
+
+Go back to Render Dashboard -> Backend Service -> Environment.
+
+Find ALLOW_ORIGINS.
+
+Change the value from \* to your specific Vercel URL.
+
+Save Changes. Render will restart.
+
+Done! Your app is fully live and secure.
+
+🧪 Advanced: Deploying a "Dev" Environment
+
+In professional software, we never push directly to main. We push to a dev branch first. Here is how to set up a separate deployment for your dev branch.
+
+1. Create the Git Branch
+
+In your terminal:
+
+git checkout -b dev
+git push -u origin dev
+
+2. Create a Separate Backend (Render)
+
+Go to Render and create a Second Web Service.
+
+Name: my-app-backend-dev (Notice the "-dev" suffix).
+
+Branch: Select dev (This is the magic step).
+
+Environment Variables:
+
+DATABASE_URL: Paste the DEV connection string from Neon.
+
+ALLOW_ORIGINS: _ (Since Vercel Dev URLs change, _ is safest for the Dev backend).
+
+3. Configure the Frontend (Vercel)
+
+Vercel handles dev environments using "Preview Deployments". We just need to tell it to use a different API URL for non-main branches.
+
+Go to your Vercel Project Dashboard.
+
+Click Settings -> Environment Variables.
+
+Add New Variable:
+
+Name: VITE_API_URL
+
+Value: https://my-app-backend-dev.onrender.com (Your DEV Backend URL).
+
+Select Environments: Uncheck "Production". Check "Preview" and "Development".
+
+Click Save.
+
+4. The Result
+
+Users on main: Vercel uses the Production Backend -> Main DB.
+
+You on dev: Vercel uses the Dev Backend -> Dev DB.
+
+You now have a fully isolated playground!
