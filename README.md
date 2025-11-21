@@ -1,3 +1,5 @@
+_Planned and supervised with human eyes, generated with AI, and reviewed with a few cups of coffee_
+
 # 🏁 Getting Started with the Boilerplate
 
 Welcome! This guide will help you fork this repository, set up your environment, and get the application running on your machine using VS Code.
