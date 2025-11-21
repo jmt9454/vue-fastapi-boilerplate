@@ -22,7 +22,7 @@ Clone: Open your terminal/command prompt and run:
 
 # Replace YOUR-USERNAME with your actual GitHub username
 
-git clone https://github.com/YOUR-USERNAME/vue-fastapi-boilerplate.git
+git clone [https://github.com/YOUR-USERNAME/vue-fastapi-boilerplate.git](https://github.com/YOUR-USERNAME/vue-fastapi-boilerplate.git)
 cd vue-fastapi-boilerplate
 
 Open in VS Code:
@@ -126,16 +126,6 @@ Click "Check Connection".
 
 If it says "Backend is running!", you are ready to code!
 
-🆘 Common Issues
-
-"uv is not recognized": Restart VS Code after installing uv.
-
-"ModuleNotFoundError: No module named 'app'": You are running uvicorn from the wrong folder. Make sure you cd backend before running uvicorn.
-
-"Internal Server Error" when saving data: You forgot to run alembic upgrade head to create your database tables.
-
-"CORS Error": Check your backend/.env file. Ensure ALLOW_ORIGINS includes http://localhost:5173.
-
 🛡️ Key Concept: Environment Safety
 
 It is important to understand where your data lives so you don't accidentally delete real user data.
@@ -208,7 +198,7 @@ Click Create Branch.
 
 You will see a new Connection String specific to this branch.
 
-Save this! Use this URL if you set up a separate "Dev" deployment on Render.
+Save this! You will use this URL if you set up a separate "Dev" deployment on Render.
 
 🚀 Deploying the Backend (Render)
 
@@ -332,7 +322,7 @@ Branch: Select dev (This is the magic step).
 
 Environment Variables:
 
-DATABASE_URL: Paste the DEV connection string from Neon.
+DATABASE_URL: Paste the DEV connection string from Neon (the one you made in the "Branches" step).
 
 ALLOW_ORIGINS: _ (Since Vercel Dev URLs change, _ is safest for the Dev backend).
 
@@ -361,3 +351,9 @@ Users on main: Vercel uses the Production Backend -> Main DB.
 You on dev: Vercel uses the Dev Backend -> Dev DB.
 
 You now have a fully isolated playground!
+
+🆘 Common Issues
+
+"uv is not recognized": Restart VS Code after installing uv.
+
+"ModuleNotFoundError: No module named 'app'": You are running u
