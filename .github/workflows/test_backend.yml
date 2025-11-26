@@ -21,7 +21,7 @@ jobs:
         run: |
           pip install uv
           uv venv
-          uv pip install fastapi uvicorn sqlalchemy alembic pydantic python-dotenv httpx pytest
+          uv sync
 
       - name: Create Dummy Environment
         run: |
@@ -33,6 +33,6 @@ jobs:
 
       - name: Run Tests
         run: |
-          # FIX: Add current directory (.) to PYTHONPATH so Python finds 'app'
+          # Begin tests
           export PYTHONPATH=$PYTHONPATH:.
           .venv/bin/pytest
