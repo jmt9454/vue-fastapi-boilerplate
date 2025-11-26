@@ -21,7 +21,7 @@ jobs:
         run: |
           pip install uv
           uv venv
-          uv pip install fastapi uvicorn sqlalchemy alembic pydantic python-dotenv httpx pytest
+          uv sync
 
       - name: Create Dummy Environment
         run: |
@@ -31,8 +31,22 @@ jobs:
           echo "DATABASE_URL=sqlite:///:memory:" >> .env
           echo "ALLOW_ORIGINS=http://localhost:3000" >> .env
 
+      - name: Verify Database Schema
+        env:
+          # Use a file-based SQLite DB so persistence persists between commands
+          DATABASE_URL: "sqlite:///./ci_test.db"
+          # Ensure your app config reads this ENV VAR over the default setting
+          PYTHONPATH: .
+        run: |
+          echo "1. Applying existing migrations to temporary DB..."
+          uv run alembic upgrade head
+
+          echo "2. Checking for model/schema drift..."
+          # This command fails (exit code 1) if models differ from the DB
+          uv run alembic check
+
       - name: Run Tests
         run: |
-          # FIX: Add current directory (.) to PYTHONPATH so Python finds 'app'
+          # Begin tests
           export PYTHONPATH=$PYTHONPATH:.
           .venv/bin/pytest

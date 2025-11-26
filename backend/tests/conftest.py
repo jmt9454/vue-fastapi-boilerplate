@@ -5,50 +5,47 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.main import app
-from app.core.database import Base
-from app.routers.students import get_db
+from app.core.database import Base, get_db
 
-# 1. Create an In-Memory SQLite Database
-# "check_same_thread=False" is needed for SQLite in tests
+# 1. Create an in-memory SQLite database for testing
+# check_same_thread=False is needed for SQLite with FastAPI threading
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
+    SQLALCHEMY_DATABASE_URL, 
+    connect_args={"check_same_thread": False}, 
+    poolclass=StaticPool
 )
-
-# 2. Create a Testing Session
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# 3. Fixture: Setup the DB before tests, Tear it down after
-@pytest.fixture(name="session")
-def db_session():
-    # Create tables in the memory DB
+# 2. Fixture to create/drop tables for each test session
+@pytest.fixture(scope="function")
+def db():
+    # Create tables
     Base.metadata.create_all(bind=engine)
-    db = TestingSessionLocal()
+    
+    session = TestingSessionLocal()
     try:
-        yield db
+        yield session
     finally:
-        db.close()
-        # Drop tables after tests (optional with memory DB, but good practice)
+        session.close()
+        # Drop tables after test to ensure clean state
         Base.metadata.drop_all(bind=engine)
 
-# 4. Fixture: The TestClient that uses the overridden DB
-@pytest.fixture(name="client")
-def client_fixture(session):
-    # Define the override
+# 3. Fixture for the FastAPI Client with DB override
+@pytest.fixture(scope="function")
+def client(db):
     def override_get_db():
         try:
-            yield session
+            yield db
         finally:
-            session.close()
-
-    # Apply the override
+            db.close()
+    
+    # Override the dependency
     app.dependency_overrides[get_db] = override_get_db
     
-    # Return the TestClient
-    yield TestClient(app)
+    with TestClient(app) as c:
+        yield c
     
-    # Clear overrides
+    # Clean up
     app.dependency_overrides.clear()

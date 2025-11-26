@@ -12,8 +12,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 # --- 2. IMPORT YOUR APP'S BASE AND MODELS ---
 # This is critical! If you don't import them, Alembic thinks your DB is empty.
-from app.core.database import Base
-from app.models import * # Ensure app/models/__init__.py imports your classes!
+from app.core.database import Base #noqa E402
+from app.models import * # Ensure app/models/__init__.py imports your classes! #noqa E402 F403
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

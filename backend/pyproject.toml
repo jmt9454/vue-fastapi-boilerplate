@@ -16,9 +16,33 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "aiosqlite>=0.21.0",
     "httpx>=0.28.1",
     "mypy>=1.18.2",
+    "polyfactory>=3.1.0",
     "pre-commit>=4.4.0",
     "pytest>=9.0.1",
+    "pytest-asyncio>=1.3.0",
     "ruff>=0.14.5",
 ]
+
+[tool.pytest.ini_options]
+# Add the current directory to PYTHONPATH so we can import "app" in tests
+pythonpath = "."
+
+# Look for tests in the "tests" directory
+testpaths = ["tests"]
+
+addopts = "-v -ra --strict-markers"
+
+# Treat warnings as errors (optional, good for robust testing)
+# filterwarnings = [
+#     "error",
+#     "ignore::DeprecationWarning",
+#     "ignore::UserWarning",
+# ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+exclude = ["alembic*", "tests*"]
