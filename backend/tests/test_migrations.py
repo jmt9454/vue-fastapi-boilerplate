@@ -5,7 +5,7 @@ from alembic.script import ScriptDirectory
 from alembic.runtime.migration import MigrationContext
 from alembic.autogenerate import compare_metadata
 from sqlalchemy import create_engine
-from app.db.base import Base  # CRITICAL: This must import all your models!
+from app.core.database import Base  # CRITICAL: This must import all your models!
 from app.core.config import settings
 
 # Setup a clean engine just for migration tests
