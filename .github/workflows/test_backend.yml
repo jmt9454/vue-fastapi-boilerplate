@@ -21,7 +21,7 @@ jobs:
         run: |
           pip install uv
           uv venv
-          uv pip install -r pyproject.toml --all-extras
+          uv pip install -e . --all-extras
 
       - name: Create Dummy Environment
         run: |

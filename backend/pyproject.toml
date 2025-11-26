@@ -41,3 +41,8 @@ addopts = "-v -ra --strict-markers"
 #     "ignore::DeprecationWarning",
 #     "ignore::UserWarning",
 # ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+exclude = ["alembic*", "tests*"]
