@@ -21,7 +21,7 @@ jobs:
         run: |
           pip install uv
           uv venv
-          uv pip install fastapi uvicorn sqlalchemy alembic pydantic python-dotenv httpx pytest
+          uv pip install -e . --all-extras
 
       - name: Create Dummy Environment
         run: |
