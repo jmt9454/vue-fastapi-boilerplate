@@ -33,6 +33,6 @@ jobs:
 
       - name: Run Tests
         run: |
-          # FIX: Add current directory (.) to PYTHONPATH so Python finds 'app'
+          # Begin tests
           export PYTHONPATH=$PYTHONPATH:.
           .venv/bin/pytest
