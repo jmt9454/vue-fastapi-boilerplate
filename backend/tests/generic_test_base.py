@@ -56,6 +56,7 @@ class CRUDApiTestBase:
         # 2. Generate update data
         update_data = self.update_factory.build()
         payload = update_data.model_dump(mode='json', exclude_unset=True)
+        payload = {k: v for k, v in payload.items() if v is not None}
 
         # 3. PUT item
         response = client.put(f"{self.url_prefix}/{item_id}", json=payload)
