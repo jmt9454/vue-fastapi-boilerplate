@@ -13,7 +13,9 @@ class Settings(BaseSettings):
     # CORS (Cross-Origin Resource Sharing)
     # This validator parses a comma-separated string from .env into a List
     # Example .env: ALLOW_ORIGINS=http://localhost:3000,http://localhost:8080
-    ALLOW_ORIGINS: List[AnyHttpUrl] = []
+    # FIX: We use Union[List[AnyHttpUrl], str] to prevent pydantic-settings from 
+    # failing when parsing a non-JSON comma-separated string from the .env file.
+    ALLOW_ORIGINS: Union[List[AnyHttpUrl], str] = []
 
     @field_validator("ALLOW_ORIGINS", mode="before")
     @classmethod
