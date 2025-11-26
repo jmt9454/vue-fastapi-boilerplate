@@ -1,4 +1,4 @@
-from typing import Any, List, Type
+from typing import List, Type
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
