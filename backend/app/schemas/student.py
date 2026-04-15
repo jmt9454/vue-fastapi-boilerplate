@@ -23,3 +23,4 @@ class StudentResponse(StudentBase):
 
     class Config:
         from_attributes = True
+        
